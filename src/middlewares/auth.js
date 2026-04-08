@@ -23,8 +23,9 @@ const protect = async (req, res, next) => {
 
     if (role === 'Admin') {
       [user] = await pool.query('SELECT * FROM admins WHERE id = ?', [id]);
-    } else if (role === 'Staff') {
-      [user] = await pool.query('SELECT * FROM staff WHERE id = ?', [id]);
+    } else if (['Staff', 'Manager', 'Technician'].includes(role)) {
+      [user] = await pool.query('SELECT staff.*, r.name AS role_name FROM staff JOIN roles r ON staff.role_id = r.id WHERE staff.id = ?', [id]);
+      if (user && user.length > 0) user[0].role = user[0].role_name;
     } else {
       [user] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
     }
