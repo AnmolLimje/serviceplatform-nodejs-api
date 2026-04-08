@@ -69,6 +69,14 @@ const AuthRepository = {
   async findUserById(id) {
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
     return rows[0];
+  },
+
+  async findByIdAndRole(id, role) {
+    const [rows] = await pool.query(
+      'SELECT * FROM vw_all_users WHERE id = ? AND role_name = ?',
+      [id, role]
+    );
+    return rows[0];
   }
 };
 

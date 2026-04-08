@@ -16,25 +16,17 @@ const protect = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-
-    // Check if user still exists in their respective table
-    let user;
     const { id, role } = decoded;
 
-    if (role === 'Admin') {
-      [user] = await pool.query('SELECT * FROM admins WHERE id = ?', [id]);
-    } else if (['Staff', 'Manager', 'Technician'].includes(role)) {
-      [user] = await pool.query('SELECT staff.*, r.name AS role_name FROM staff JOIN roles r ON staff.role_id = r.id WHERE staff.id = ?', [id]);
-      if (user && user.length > 0) user[0].role = user[0].role_name;
-    } else {
-      [user] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+    // Use consolidated view to check if user exists
+    const AuthRepository = require('../data-access/auth-repository');
+    const user = await AuthRepository.findByIdAndRole(id, role);
+
+    if (!user) {
+      return next(new AppError('The user belonging to this token no longer exists or role mismatch.', 401));
     }
 
-    if (!user || user.length === 0) {
-      return next(new AppError('The user belonging to this token no longer exists.', 401));
-    }
-
-    req.user = user[0];
+    req.user = user;
     delete req.user.password_hash;
     req.user.role = role;
     next();
