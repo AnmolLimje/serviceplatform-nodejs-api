@@ -18,6 +18,11 @@ const path = require('path');
 
 const swaggerDocument = YAML.load(path.join(__dirname, '../docs/swagger.yaml'));
 
+// Dynamically set Swagger base URL from environment variable
+if (process.env.SWAGGER_BASE_URL) {
+  swaggerDocument.servers = [{ url: process.env.SWAGGER_BASE_URL }];
+}
+
 const app = express();
 
 // Middlewares
