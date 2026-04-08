@@ -1,0 +1,597 @@
+openapi: 3.0.0
+info:
+  title: Service Booking Platform API
+  version: 1.0.0
+  description: |
+    Comprehensive API for managing service bookings, staff, and customer reviews.
+    
+    ### 🔐 Authentication Flow
+    1. **Register** as a User.
+    2. **Login** to get an `accessToken` and `refreshToken`.
+    3. Use the `accessToken` in the `Authorization: Bearer <token>` header for all protected requests.
+    4. Use the `refreshToken` to get a new `accessToken` via `/auth/refresh` once the original is expired.
+servers:
+  - url: http://localhost:5000/api/v1
+security:
+  - bearerAuth: []
+  - accessTokenAuth: []
+paths:
+  # --- AUTH ---
+  /auth/register:
+    post:
+      summary: Register as a customer
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        201:
+          description: User created successfully
+  /auth/login:
+    post:
+      summary: Unified login for all roles
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        200:
+          description: Successful login
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      parameters:
+        - in: header
+          name: x-refresh-token
+          description: Alternative way to pass the refresh token
+          schema: { type: string }
+      responses:
+        200:
+          description: New tokens generated
+  /auth/me:
+    get:
+      summary: Get current authenticated user profile
+      tags: [Auth]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      responses:
+        200:
+          description: User profile details
+    patch:
+      summary: Update user profile
+      tags: [Auth]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                phone: { type: string }
+                address: { type: string }
+      responses:
+        200:
+          description: Profile updated
+
+  # --- SERVICES ---
+  /services/categories:
+    get:
+      summary: List all service categories
+      tags: [Services]
+      responses:
+        200:
+          description: List of categories
+  /services:
+    get:
+      summary: List all services with filters and pagination
+      tags: [Services]
+      parameters:
+        - in: query
+          name: category_id
+          schema: { type: integer }
+        - in: query
+          name: min_price
+          schema: { type: number }
+        - in: query
+          name: max_price
+          schema: { type: number }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10 }
+      responses:
+        200:
+          description: List of services with pagination metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "success" }
+                  results: { type: integer, example: 10 }
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Service'
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer, example: 50 }
+                      page: { type: integer, example: 1 }
+                      limit: { type: integer, example: 10 }
+                      totalPages: { type: integer, example: 5 }
+    post:
+      summary: Create a new service (Admin/Staff only)
+      tags: [Services]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRequest'
+      responses:
+        201:
+          description: Service created
+  /services/{id}:
+    get:
+      summary: Get service details by ID
+      tags: [Services]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Service details
+    put:
+      summary: Update service details (Admin/Staff only)
+      tags: [Services]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRequest'
+      responses:
+        200:
+          description: Service updated
+    delete:
+      summary: Delete a service (Admin only)
+      tags: [Services]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        204:
+          description: Service deleted
+
+  # --- BOOKINGS ---
+  /bookings:
+    post:
+      summary: Create a new booking (User only)
+      tags: [Bookings]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequest'
+      responses:
+        201:
+          description: Booking created
+    get:
+      summary: List all bookings (Admin/Staff only)
+      tags: [Bookings]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      responses:
+        200:
+          description: List of all bookings
+  /bookings/my:
+    get:
+      summary: View current user's bookings (User only)
+      tags: [Bookings]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      responses:
+        200:
+          description: List of user bookings
+  /bookings/{id}:
+    get:
+      summary: Get detailed booking info
+      tags: [Bookings]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Booking details
+  /bookings/{id}/status:
+    patch:
+      summary: Update booking status (Admin/Staff only)
+      tags: [Bookings]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [Pending, Confirmed, Completed, Cancelled]
+      responses:
+        200:
+          description: Status updated
+    patch:
+      summary: Reschedule a booking (User only)
+      tags: [Bookings]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_time]
+              properties:
+                booking_time: { type: string, format: date-time }
+      responses:
+        200:
+          description: Rescheduled successfully
+  /bookings/{id}/assign:
+    post:
+      summary: Assign staff to a booking (Admin only)
+      tags: [Bookings]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [staff_id]
+              properties:
+                staff_id: { type: integer }
+      responses:
+        200:
+          description: Staff assigned
+
+  # --- STAFF ---
+  /staff/roles:
+    get:
+      summary: List all possible staff roles (Admin/Staff only)
+      tags: [Staff]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      responses:
+        200:
+          description: List of roles
+  /staff:
+    get:
+      summary: List all staff (Admin/Staff only)
+      tags: [Staff]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      responses:
+        200:
+          description: List of staff members
+    post:
+      summary: Add a new staff member (Admin only)
+      tags: [Staff]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffRequest'
+      responses:
+        201:
+          description: Staff member created
+  /staff/{id}:
+    delete:
+      summary: Remove a staff member (Admin only)
+      tags: [Staff]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        204:
+          description: Staff deleted
+
+  # --- REVIEWS ---
+  /reviews/service:
+    post:
+      summary: Rate a completed service (User only)
+      tags: [Reviews]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+      responses:
+        201:
+          description: Review submitted
+  /reviews/user:
+    post:
+      summary: Rate a customer interaction (Staff only)
+      tags: [Reviews]
+      parameters:
+        - in: header
+          name: x-access-token
+          description: Alternative way to pass the access token
+          schema: { type: string }
+      security:
+        - bearerAuth: []
+        - accessTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+      responses:
+        201:
+          description: Review submitted
+  /reviews/service/{serviceId}:
+    get:
+      summary: Get all reviews for a service
+      tags: [Reviews]
+      parameters:
+        - in: path
+          name: serviceId
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: List of reviews
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Standard Authorization header using the Bearer scheme.
+    accessTokenAuth:
+      type: apiKey
+      in: header
+      name: x-access-token
+      description: Alternative header for providing the access token.
+    refreshTokenAuth:
+      type: apiKey
+      in: header
+      name: x-refresh-token
+      description: Alternative header for provide the refresh token (mainly for /auth/refresh).
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, example: "John Doe" }
+        email: { type: string, format: email, example: "john@example.com" }
+        password: { type: string, format: password, example: "securePassword123" }
+        phone: { type: string, example: "+1234567890" }
+        address: { type: string, example: "123 Main St" }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: "john@example.com" }
+        password: { type: string, format: password, example: "securePassword123" }
+    ServiceRequest:
+      type: object
+      required: [category_id, name, price, duration_minutes]
+      properties:
+        category_id: { type: integer, example: 1 }
+        name: { type: string, example: "Pipe Leak Repair" }
+        description: { type: string, example: "Fixing major pipe leaks" }
+        price: { type: number, example: 50.00 }
+        duration_minutes: { type: integer, example: 60 }
+    BookingRequest:
+      type: object
+      required: [service_id, booking_time]
+      properties:
+        service_id: { type: integer, example: 1 }
+        booking_time: { type: string, format: date-time, example: "2026-04-10T10:00:00Z" }
+        notes: { type: string, example: "Front gate is broken" }
+    Service:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        category_id: { type: integer, example: 1 }
+        category_name: { type: string, example: "Plumbing" }
+        name: { type: string, example: "Pipe Leak Repair" }
+        description: { type: string, example: "Fixing major pipe leaks" }
+        price: { type: number, example: 50.00 }
+        duration_minutes: { type: integer, example: 60 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ReviewRequest:
+      type: object
+      required: [booking_id, rating]
+      properties:
+        booking_id: { type: integer, example: 1 }
+        rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
+        comment: { type: string, example: "Great work!" }
+    StaffRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, example: "Jane Doe" }
+        email: { type: string, format: email, example: "jane@example.com" }
+        password: { type: string, format: password, example: "securePassword123" }
+        phone: { type: string, example: "+1234567890" }
+        role_id: { type: integer, example: 3 }
